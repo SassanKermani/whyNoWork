@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>page</title>
+</head>
+<body>
+	<div id="call">
+		<h3>call</h3>
+		<p id="callObj"></p>
+		<input id="callInput" type="text"><br>
+		<button id="callGo" >connect</button>
+	</div>
+	<hr>
+	<div id="awnser">
+		<h3>awnser</h3>
+		<input id="awnserInput" type="text"><br>
+		<button id="awnserGo" >create awnser</button><br>
+		<p id="awnserObj"></p>
+	</div>
+<script type="text/javascript">
+
+	/*=============================
+	=            class            =
+	=============================*/
+	
+	let newRTc = class{
+		constructor(){
+			this.rtcConnection = new RTCPeerConnection(RTCPeerConnection.defaultIceServers);
+			this.dataChannel = this.rtcConnection.createDataChannel('dataChannel');
+			this.offer;
+			this.response;
+			this.ice;
+
+			this.dataChannelLogic = (thing)=>{};
+			this.trackChannelLogic = (thing)=>{};
+
+			this.rtcConnection.onicecandidate = (event)=>{
+				if(event.candidate){
+					this.ice = event.candidate;
+				}
+			};
+
+			this.rtcConnection.ondatachannel = (event)=>{
+				this.dataChannelLogic(event);
+			}
+		}
+
+		callPartOne(){
+			this.rtcConnection.createOffer().then((offer)=>{
+				this.rtcConnection.setLocalDescription(offer);
+				this.offer = offer;
+			});
+		}
+
+		callPartTwo(response, ice){
+			this.rtcConnection.setRemoteDescription(response);
+			this.rtcConnection.addIceCandidate(ice);
+		}
+
+		awnser(offer, ice){
+			this.rtcConnection.setRemoteDescription(offer);
+			this.rtcConnection.addIceCandidate(ice);
+			this.rtcConnection.createAnswer().then((response)=>{
+				this.rtcConnection.setLocalDescription(response)
+				this.response = response;
+			});
+		}
+
+		send(message){
+			if(this.dataChannel.readyState == `open`){
+				this.dataChannel.send(message);
+			}
+		}
+
+		onmessage(userLogic){
+			this.dataChannelLogic = userLogic;
+		}
+
+	}
+	
+	/*=====  End of class  ======*/
+
+	/*==========================================
+	=            This page spacific            =
+	==========================================*/
+	
+	/*----------  Call  ----------*/
+	let call = new newRTc();
+	call.callPartOne();
+	setTimeout(function() {
+		document.getElementById('callObj').innerHTML = JSON.stringify({data : call.offer, ice : call.ice});
+	}, 1000);
+	
+	document.getElementById('callGo').addEventListener(`click`, ()=>{
+		let data = JSON.parse(document.getElementById('callInput').value).data;
+		let ice = JSON.parse(document.getElementById('callInput').value).ice;
+		call.callPartTwo(data, ice);
+		
+		call.onmessage((event)=>{
+			event.channel.onmessage = (eventTwo)=>{
+				console.log(eventTwo.data);
+			};
+		});
+	});
+
+	/*----------  Awnser  ----------*/
+	let awnser = new newRTc();
+	document.getElementById('awnserGo').addEventListener(`click`, ()=>{
+		let data = JSON.parse(document.getElementById('awnserInput').value).data;
+		let ice = JSON.parse(document.getElementById('awnserInput').value).ice;
+		awnser.awnser(data, ice);
+
+		setTimeout(function() {
+			document.getElementById('awnserObj').innerHTML = JSON.stringify({data : awnser.response, ice : awnser.ice});
+
+			awnser.onmessage((event)=>{
+				event.channel.onmessage = (eventTwo)=>{
+					console.log(eventTwo.data);
+				};
+			});
+
+		}, 1000);
+
+	});
+
+	/*=====  End of This page spacific  ======*/
+	
+</script>
+</body>
+</html>
